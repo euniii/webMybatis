@@ -1,0 +1,173 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace = "ldg.mybatis">
+
+	<!-- 가계부 작성 시퀀스 -->
+	<select id="getNextNumber2" resultType="int">
+		select boardser.nextval from dual
+	</select>
+	
+	<!-- 가계부 작성 -->
+	<insert id="haruinsert" parameterType="Board">
+		insert into mainBoard(main_num,main_writeday,main_option,main_account,main_content,main_price,main_id) 
+		values(#{main_num},#{main_writeday},#{main_option},#{main_account},#{main_content},#{main_price},#{main_id})
+	</insert>
+	<!-- 한도금액 체크 -->
+	<select id="moneyCheck" resultType="Board" parameterType="hashmap">
+		select  ( select sum(main_price) main_price 
+        from mainboard where main_id = #{id} 
+          and main_option ='1' and main_writeday between to_char(TRUNC(sysdate,'MM'),'YYYYMMDD') and to_char(last_day(sysdate),'YYYYMMDD')
+          )main_price, (select to_number(m_money) m_money from memberbd where m_id = #{id} ) m_money 
+          from mainboard group by main_id
+          
+	</select>
+	
+	<!-- 가계부 리스트 -->
+	<select id="mainList" resultType="Board" parameterType="hashmap">
+		select * from (select rownum rnum ,a.* 
+			from (select main_num, to_char(to_date(main_writeday),'YYYY-MM-DD') main_writeday, decode(main_option,'1','지출','수입') main_option, main_account, main_content, TO_CHAR( main_price ,'999,999,999,999,999') main_price
+			from mainBoard where main_id=#{id}
+		<if test = "key1 != null and key1 != '항목선택'">
+			and mainBoard.MAIN_OPTION=#{key1}
+		</if>
+		<if test = "key2 != null and key2 != '계정선택'">
+			and mainBoard.MAIN_ACCOUNT=#{key2}
+		</if>
+		<if test = "startDt != null and endDt != null">
+			and main_writeday between #{startDt} and #{endDt} 
+		</if>
+		order by main_writeday desc)a)
+		<if test = "startRow != null and endRow != null">
+		 where rnum between #{startRow} and #{endRow}
+		 </if>
+	</select>
+	
+	<!-- 가계부 리스트 카운트 -->
+	<select id="mainCount" resultType="int" parameterType="hashmap">
+		select count(*) from (select rownum rnum ,a.*  
+			from (select main_num, to_char(to_date(main_writeday),'YYYY-MM-DD') main_writeday, decode(main_option,'1','지출','수입') main_option, main_account, main_content, TO_CHAR( main_price ,'999,999,999,999,999') main_price
+			from mainBoard where main_id=#{id}
+		<if test = "key1 != null and key1 != '항목선택'">
+			and mainBoard.MAIN_OPTION=#{key1}
+		</if>
+		<if test = "key2 != null and key2 != '계정선택'">
+			and mainBoard.MAIN_ACCOUNT=#{key2}
+		</if>
+		<if test = "startDt != null and endDt != null">
+			and main_writeday between #{startDt} and #{endDt} 
+		</if>
+		order by main_writeday desc)a) 
+	</select>
+	
+	<!-- 가계부 상세보기 -->
+	<select id="Contentview" resultType="Board" parameterType="hashmap">
+		select main_num, main_writeday, decode(main_option,'1','지출','수입') main_option,
+			main_account, main_content, main_price from mainBoard where main_num = #{num}
+	</select>
+	
+	<!-- 가계부 수정 -->
+	<update id="updateBoard" parameterType="Board">
+		update mainboard set main_writeday=#{main_writeday},main_content=#{main_content}, 
+			main_price=#{main_price} where main_num=#{main_num}
+	</update>
+	
+	<!-- 가계부 삭제 -->
+	<delete id="deleteBoard" parameterType="int">
+		delete from mainboard where main_num=#{num}
+	</delete>
+	
+	
+	<!-- 가계부 리스트 합계/지줄 -->
+	<select id="totPrice" resultType="Board" parameterType="hashmap">
+		select nvl(TO_CHAR(sum(main_price),'999,999,999,999,999'),0) tot_spend 
+		from mainboard where main_option='1' 
+		<if test = "key2 != null and key2 != '계정선택' ">
+			and main_account=#{key2}
+		</if>
+		<if test = "startDt != null and endDt != null">
+			and MAIN_WRITEDAY between #{startDt} and #{endDt}
+		</if>
+		and main_id= #{id} group by main_id
+	</select>
+	<!-- 가계부 리스트 합계/수입 -->
+	<select id="totPrice2" resultType="Board" parameterType="hashmap">
+		select nvl(TO_CHAR(sum(main_price),'999,999,999,999,999'),0) tot_import
+		from mainboard where main_option='2'
+		<if test = "key2 != null and key2 != '계정선택' ">
+			and main_account=#{key2}
+		</if>
+		<if test = "startDt != null and endDt != null">
+			and MAIN_WRITEDAY between #{startDt} and #{endDt}
+		</if>
+		and main_id =#{id} group by main_id
+	</select>
+	
+	<select id="foodCnt" resultType="int" parameterType="hashmap">
+		select nvl(sum(main_price),0)
+			from MAINBOARD 
+			where main_id = #{id} and main_option = #{main_option} and main_account='식비'
+	            and main_writeday between #{date1} and #{date2}
+	</select>
+	<select id="carCnt" resultType="int" parameterType="hashmap">
+		select nvl(sum(main_price),0)
+			from MAINBOARD 
+			where main_id = #{id} and main_option = #{main_option} and main_account='교통비'
+	            and main_writeday between #{date1} and #{date2}
+	</select>
+	<select id="healthCnt" resultType="int" parameterType="hashmap">
+		select nvl(sum(main_price),0)
+			from MAINBOARD 
+			where main_id = #{id} and main_option = #{main_option} and main_account='건강의료'
+	            and main_writeday between #{date1} and #{date2}
+	</select>
+	<select id="phoneCnt" resultType="int" parameterType="hashmap">
+		select nvl(sum(main_price),0)
+			from MAINBOARD 
+			where main_id = #{id} and main_option = #{main_option} and main_account='통신비'
+	            and main_writeday between #{date1} and #{date2}
+	</select>
+	
+	<select id="articleCnt" resultType="int" parameterType="hashmap">
+		select nvl(sum(main_price),0)
+			from MAINBOARD 
+			where main_id = #{id} and main_option = #{main_option} and main_account='생활용품비'
+	            and main_writeday between #{date1} and #{date2}
+	</select>
+	
+	<select id="culturalCnt" resultType="int" parameterType="hashmap">
+		select nvl(sum(main_price),0) 
+			from MAINBOARD 
+			where main_id = #{id} and main_option = #{main_option} and main_account='문화생활비'
+	            and main_writeday between #{date1} and #{date2}
+	</select>
+	
+	<select id="beautyCnt" resultType="int" parameterType="hashmap">
+		select nvl(sum(main_price),0)
+			from MAINBOARD 
+			where main_id = #{id} and main_option = #{main_option} and main_account='미용의류'
+	            and main_writeday between #{date1} and #{date2}
+	</select>
+	
+	
+	<!-- 수입 -->
+	<select id="payCnt" resultType="int" parameterType="hashmap">
+		select nvl(sum(main_price),0)
+			from MAINBOARD 
+			where main_id = #{id} and main_option = #{main_option} and main_account='급여'
+	         	and main_writeday between #{date1} and #{date2}
+	</select>
+	<select id="interestCnt" resultType="int" parameterType="hashmap">
+		select nvl(sum(main_price),0)
+			from MAINBOARD 
+			where main_id = #{id} and main_option = #{main_option} and main_account='이자수익'
+	         	and main_writeday between #{date1} and #{date2}
+	</select>
+	<select id="otherCnt" resultType="int" parameterType="hashmap">
+		select nvl(sum(main_price),0)
+			from MAINBOARD 
+			where main_id = #{id} and main_option = #{main_option} and main_account='기타'
+	         	and main_writeday between #{date1} and #{date2}
+	</select>
+	
+</mapper>
